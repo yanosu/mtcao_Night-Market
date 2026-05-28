@@ -5,357 +5,1262 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Visitor Log</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500&family=Outfit:wght@300;400;500;600&display=swap" rel="stylesheet">
-<!-- docx.js UMD build + FileSaver for client-side Word export -->
 <script src="https://unpkg.com/docx@8.5.0/build/index.umd.js"></script>
 <script src="https://unpkg.com/file-saver@2.0.5/dist/FileSaver.min.js"></script>
 <style>
-  :root {
-    --glass-bg: rgba(255,255,255,0.10);
-    --glass-border: rgba(255,255,255,0.22);
-    --glass-shadow: 0 8px 40px rgba(0,0,0,0.28);
-    --glass-blur: blur(18px);
-    --accent-teal: #00e5c3;
-    --accent-coral: #ff6b6b;
-    --accent-gold: #ffd166;
-    --text-bright: #ffffff;
-    --text-dim: rgba(255,255,255,0.58);
-    --text-mid: rgba(255,255,255,0.82);
-    --male-col: #74b9ff;
-    --female-col: #ff9ff3;
-  }
+/* ============================================================
+   CSS CUSTOM PROPERTIES
+   ============================================================ */
 
-  * { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --glass-bg:     rgba(255, 255, 255, 0.10);
+  --glass-border: rgba(255, 255, 255, 0.22);
+  --glass-shadow: 0 8px 40px rgba(0, 0, 0, 0.28);
+  --glass-blur:   blur(18px);
 
-  body {
-    font-family: 'Outfit', sans-serif;
-    min-height: 100vh;
-    background: #0a1628;
-    overflow-x: hidden;
-    color: var(--text-bright);
-  }
+  --accent-teal:   #00e5c3;
+  --accent-coral:  #ff6b6b;
+  --accent-gold:   #ffd166;
+  --accent-purple: #c084fc;
 
-  /* ── ANIMATED BACKGROUND ── */
-  .bg-canvas { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
-  .orb {
-    position: absolute; border-radius: 50%;
-    filter: blur(80px); opacity: 0.45;
-    animation: drift linear infinite;
-  }
-  .orb-1 { width: 420px; height: 420px; background: radial-gradient(circle,#00e5c3,#0066ff); top:-10%; left:-10%; animation-duration:22s; }
-  .orb-2 { width: 350px; height: 350px; background: radial-gradient(circle,#9b59b6,#e84393); top:40%; right:-8%; animation-duration:28s; animation-delay:-10s; }
-  .orb-3 { width: 300px; height: 300px; background: radial-gradient(circle,#f39c12,#e74c3c); bottom:-8%; left:30%; animation-duration:19s; animation-delay:-5s; }
-  @keyframes drift {
-    0%  { transform: translate(0,0) scale(1); }
-    33% { transform: translate(30px,-20px) scale(1.05); }
-    66% { transform: translate(-20px,30px) scale(0.97); }
-    100%{ transform: translate(0,0) scale(1); }
-  }
+  --text-bright: #ffffff;
+  --text-dim:    rgba(255, 255, 255, 0.58);
+  --text-mid:    rgba(255, 255, 255, 0.82);
 
-  /* ── GATE ── */
-  #surveyor-gate {
-    position: fixed; inset: 0; z-index: 999;
-    display: flex; align-items: center; justify-content: center; padding: 24px;
-    background: rgba(10,22,40,0.65); backdrop-filter: blur(8px);
-  }
-  .gate-card {
-    background: rgba(255,255,255,0.10); border: 1px solid var(--glass-border);
-    backdrop-filter: var(--glass-blur); border-radius: 28px; padding: 40px 28px;
-    width: 100%; max-width: 380px; box-shadow: var(--glass-shadow);
-    text-align: center; animation: fadeUp 0.4s ease both;
-  }
-  @keyframes fadeUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
-  .gate-icon { font-size: 3rem; margin-bottom: 14px; }
-  .gate-card h2 { font-family:'Playfair Display',serif; font-size:1.9rem; font-weight:500; color:var(--text-bright); margin-bottom:6px; }
-  .gate-card .sub { font-size:0.82rem; color:var(--text-dim); margin-bottom:28px; }
-  .gate-input-wrap { position: relative; margin-bottom: 12px; }
-  .gate-input-wrap span { position:absolute; left:14px; top:50%; transform:translateY(-50%); font-size:1rem; opacity:0.6; }
-  .gate-card input {
-    width:100%; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.2);
-    border-radius:12px; padding:14px 14px 14px 40px; font-size:1rem; font-family:'Outfit',sans-serif;
-    color:white; letter-spacing:0.06em; transition:border-color 0.2s,background 0.2s;
-  }
-  .gate-card input::placeholder { color:rgba(255,255,255,0.3); }
-  .gate-card input:focus { outline:none; border-color:var(--accent-teal); background:rgba(255,255,255,0.13); }
-  .gate-error { color:var(--accent-coral); font-size:0.78rem; margin-bottom:10px; display:none; }
-  .gate-btn {
-    width:100%; background:linear-gradient(135deg,var(--accent-teal),#00aaff);
-    color:#0a1628; border:none; border-radius:12px; padding:14px; font-size:1rem; font-weight:700;
-    font-family:'Outfit',sans-serif; cursor:pointer; transition:opacity 0.2s,transform 0.1s; letter-spacing:0.04em;
-  }
-  .gate-btn:active { opacity:0.85; transform:scale(0.98); }
-  .switch-panel { margin-top:20px; padding-top:18px; border-top:1px solid rgba(255,255,255,0.1); }
-  .switch-panel p { font-size:0.75rem; color:var(--text-dim); margin-bottom:10px; }
-  .surveyor-pills { display:flex; flex-wrap:wrap; gap:6px; justify-content:center; }
-  .s-pill {
-    background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.18);
-    border-radius:20px; padding:5px 13px; font-size:0.78rem; font-weight:600;
-    cursor:pointer; transition:all 0.18s; color:var(--text-mid);
-  }
-  .s-pill:hover { background:rgba(0,229,195,0.2); border-color:var(--accent-teal); color:var(--accent-teal); }
+  --male-col:   #74b9ff;
+  --female-col: #ff9ff3;
+}
 
-  /* ── MAIN ── */
-  .main { position: relative; z-index: 1; }
 
-  /* ── HEADER ── */
-  header {
-    background:rgba(255,255,255,0.07); border-bottom:1px solid var(--glass-border);
-    backdrop-filter:blur(24px); padding:14px 18px 16px;
-    position:sticky; top:0; z-index:100;
-  }
-  .header-row { display:flex; align-items:center; justify-content:space-between; }
-  header h1 { font-family:'Playfair Display',serif; font-size:1.4rem; font-weight:500; color:var(--text-bright); display:flex; align-items:center; gap:8px; }
-  .header-actions { display:flex; align-items:center; gap:8px; }
-  .surveyor-badge {
-    background:rgba(0,229,195,0.15); border:1px solid rgba(0,229,195,0.4);
-    border-radius:20px; padding:5px 13px; font-size:0.76rem; font-weight:600;
-    display:flex; align-items:center; gap:6px; cursor:pointer; color:var(--accent-teal); transition:background 0.2s;
-  }
-  .surveyor-badge:hover { background:rgba(0,229,195,0.25); }
-  .surveyor-badge .dot { width:6px; height:6px; background:var(--accent-teal); border-radius:50%; box-shadow:0 0 6px var(--accent-teal); }
-  .header-date { font-size:0.73rem; color:var(--text-dim); margin-top:4px; }
+/* ============================================================
+   RESET & BASE
+   ============================================================ */
 
-  /* ── EXPORT BUTTON ── */
-  .btn-export {
-    background:rgba(255,209,102,0.14); border:1px solid rgba(255,209,102,0.4);
-    border-radius:10px; padding:6px 12px; font-size:0.76rem; font-weight:600;
-    font-family:'Outfit',sans-serif; color:var(--accent-gold); cursor:pointer;
-    display:flex; align-items:center; gap:5px; transition:all 0.18s; white-space:nowrap;
-  }
-  .btn-export:hover { background:rgba(255,209,102,0.25); }
-  .btn-export:active { transform:scale(0.95); }
-  .btn-export.busy { opacity:0.55; cursor:wait; pointer-events:none; }
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
 
-  /* ── EXPORT MODAL ── */
-  .export-scope-options { display:flex; flex-direction:column; gap:8px; margin-bottom:20px; }
-  .scope-opt {
-    display:flex; align-items:center; gap:12px;
-    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.12);
-    border-radius:12px; padding:12px 14px; cursor:pointer; transition:all 0.15s;
-  }
-  .scope-opt:hover { background:rgba(255,209,102,0.1); border-color:rgba(255,209,102,0.35); }
-  .scope-opt input[type=radio] { accent-color:var(--accent-gold); width:16px; height:16px; cursor:pointer; flex-shrink:0; }
-  .scope-opt input:checked ~ .scope-text .scope-title { color:var(--accent-gold); }
-  .scope-opt:has(input:checked) { border-color:rgba(255,209,102,0.5); background:rgba(255,209,102,0.1); }
-  .scope-title { font-size:0.88rem; font-weight:600; color:var(--text-bright); }
-  .scope-desc  { font-size:0.72rem; color:var(--text-dim); margin-top:2px; }
-  .btn-export-go {
-    flex:1; background:linear-gradient(135deg,#f0b429,#d4901a);
-    color:#1a0e00; border:none; border-radius:11px; padding:13px;
-    font-size:0.95rem; font-weight:700; font-family:'Outfit',sans-serif; cursor:pointer; transition:opacity 0.2s;
-  }
-  .btn-export-go:active { opacity:0.85; }
+body {
+  font-family: 'Outfit', sans-serif;
+  min-height: 100vh;
+  background: #0a1628;
+  overflow-x: hidden;
+  color: var(--text-bright);
+}
 
-  /* format toggle pills */
-  .fmt-btn {
-    flex:1; padding:9px 10px; border-radius:10px; font-size:0.8rem; font-weight:600;
-    font-family:'Outfit',sans-serif; cursor:pointer; transition:all 0.18s;
-    border:1px solid rgba(255,255,255,0.15);
-    background:rgba(255,255,255,0.06); color:var(--text-dim);
-  }
-  .fmt-btn.active {
-    background:rgba(255,209,102,0.18); border-color:rgba(255,209,102,0.5);
-    color:var(--accent-gold);
-  }
 
-  /* ── TABS ── */
-  .tabs-section { padding:14px 16px 0; overflow-x:auto; white-space:nowrap; scrollbar-width:none; }
-  .tabs-section::-webkit-scrollbar { display:none; }
-  .tabs-row { display:inline-flex; gap:6px; padding-bottom:1px; }
-  .tab-btn {
-    background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.14);
-    border-radius:10px 10px 0 0; padding:8px 15px; font-size:0.8rem; font-weight:600;
-    color:var(--text-dim); cursor:pointer; transition:all 0.18s; white-space:nowrap;
-    font-family:'Outfit',sans-serif; display:inline-flex; align-items:center; gap:6px;
-  }
-  .tab-btn.active { background:rgba(0,229,195,0.15); border-color:rgba(0,229,195,0.45); color:var(--accent-teal); border-bottom-color:transparent; }
-  .tab-btn .tab-count { background:rgba(255,255,255,0.1); border-radius:20px; padding:1px 7px; font-size:0.7rem; }
-  .tab-btn.active .tab-count { background:rgba(0,229,195,0.2); }
-  .tab-all { background:rgba(255,255,255,0.05); border-color:rgba(255,255,255,0.1); }
-  .tab-all.active { background:rgba(255,209,102,0.15); border-color:rgba(255,209,102,0.4); color:var(--accent-gold); }
+/* ============================================================
+   BACKGROUND ORBS
+   ============================================================ */
 
-  /* ── STATS ── */
-  .stats-bar {
-    display:grid; grid-template-columns:repeat(3,1fr);
-    gap:10px; padding:14px 16px;
-    border-top:1px solid rgba(0,229,195,0.2); border-bottom:1px solid var(--glass-border);
-    background:rgba(255,255,255,0.04); backdrop-filter:blur(10px);
-  }
-  .stat-chip { background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.13); backdrop-filter:blur(10px); border-radius:14px; padding:12px 8px; text-align:center; transition:transform 0.2s; }
-  .stat-chip:hover { transform:translateY(-2px); }
-  .stat-chip .val { font-size:1.7rem; font-family:'Playfair Display',serif; line-height:1; }
-  .stat-chip .lbl { font-size:0.67rem; color:var(--text-dim); margin-top:4px; text-transform:uppercase; letter-spacing:0.07em; }
-  .stat-chip.total .val { color:var(--accent-teal); text-shadow:0 0 18px rgba(0,229,195,0.5); }
-  .stat-chip.male  .val { color:var(--male-col);   text-shadow:0 0 18px rgba(116,185,255,0.45); }
-  .stat-chip.female .val{ color:var(--female-col); text-shadow:0 0 18px rgba(255,159,243,0.45); }
+.bg-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
 
-  /* ── FORM ── */
-  .form-section { padding:16px; }
-  .form-card { background:rgba(255,255,255,0.09); border:1px solid var(--glass-border); backdrop-filter:var(--glass-blur); border-radius:20px; padding:20px; box-shadow:var(--glass-shadow); }
-  .form-card h2 { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:500; margin-bottom:18px; color:var(--text-bright); display:flex; align-items:center; justify-content:space-between; }
-  .edit-indicator { font-family:'Outfit',sans-serif; font-size:0.7rem; font-weight:600; background:rgba(255,209,102,0.2); border:1px solid rgba(255,209,102,0.4); color:var(--accent-gold); padding:3px 10px; border-radius:20px; display:none; }
+.orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.45;
+  animation: drift linear infinite;
+}
 
-  /* ── COUNTER ROW (total + two steppers) ── */
-  .counter-row { display:grid; grid-template-columns:1fr 1.4fr 1.4fr; gap:10px; margin-bottom:16px; align-items:start; }
+.orb-1 {
+  width: 420px;
+  height: 420px;
+  background: radial-gradient(circle, #00e5c3, #0066ff);
+  top: -10%;
+  left: -10%;
+  animation-duration: 22s;
+}
 
-  .total-field { display:flex; flex-direction:column; gap:6px; }
-  .total-field label { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); text-align:center; }
-  .total-field input {
-    background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.18);
-    border-radius:12px; font-size:1.5rem; font-family:'Playfair Display',serif;
-    color:var(--accent-teal); width:100%; text-align:center; padding:14px 6px;
-    transition:border-color 0.2s,background 0.2s; -moz-appearance:textfield;
-  }
-  .total-field input::placeholder { color:rgba(0,229,195,0.25); font-size:1rem; }
-  .total-field input:focus { outline:none; border-color:var(--accent-teal); background:rgba(0,229,195,0.06); }
-  .total-field input::-webkit-inner-spin-button, .total-field input::-webkit-outer-spin-button { -webkit-appearance:none; }
+.orb-2 {
+  width: 350px;
+  height: 350px;
+  background: radial-gradient(circle, #9b59b6, #e84393);
+  top: 40%;
+  right: -8%;
+  animation-duration: 28s;
+  animation-delay: -10s;
+}
 
-  /* stepper card */
-  .stepper-card { display:flex; flex-direction:column; gap:6px; }
-  .stepper-label { font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; text-align:center; }
-  .stepper-label.male-lbl   { color:var(--male-col); }
-  .stepper-label.female-lbl { color:var(--female-col); }
-  .stepper-body {
-    display:flex; flex-direction:column; align-items:center;
-    border-radius:16px; border:1.5px solid rgba(255,255,255,0.14);
-    background:rgba(255,255,255,0.06); overflow:hidden;
-    transition:border-color 0.2s,box-shadow 0.25s;
-  }
-  .stepper-body.male-stepper   { border-color:rgba(116,185,255,0.28); }
-  .stepper-body.female-stepper { border-color:rgba(255,159,243,0.28); }
-  .stepper-body.male-stepper:focus-within   { border-color:var(--male-col);   box-shadow:0 0 18px rgba(116,185,255,0.22); }
-  .stepper-body.female-stepper:focus-within { border-color:var(--female-col); box-shadow:0 0 18px rgba(255,159,243,0.22); }
+.orb-3 {
+  width: 300px;
+  height: 300px;
+  background: radial-gradient(circle, #f39c12, #e74c3c);
+  bottom: -8%;
+  left: 30%;
+  animation-duration: 19s;
+  animation-delay: -5s;
+}
 
-  .step-btn {
-    width:100%; border:none; cursor:pointer; padding:11px 0;
-    font-size:1.5rem; line-height:1; font-weight:300;
-    background:rgba(255,255,255,0.04); color:rgba(255,255,255,0.5);
-    transition:background 0.15s,color 0.15s;
-    -webkit-tap-highlight-color:transparent; user-select:none; touch-action:manipulation;
-  }
-  .step-btn:active { filter:brightness(1.4); }
-  .step-btn.plus { border-bottom:1px solid rgba(255,255,255,0.08); }
-  .step-btn.minus { border-top:1px solid rgba(255,255,255,0.08); }
+@keyframes drift {
+  0%   { transform: translate(0, 0)     scale(1); }
+  33%  { transform: translate(30px, -20px) scale(1.05); }
+  66%  { transform: translate(-20px, 30px) scale(0.97); }
+  100% { transform: translate(0, 0)     scale(1); }
+}
 
-  .male-stepper   .step-btn.plus:hover  { background:rgba(116,185,255,0.18); color:var(--male-col); }
-  .male-stepper   .step-btn.minus:hover { background:rgba(116,185,255,0.10); color:var(--male-col); }
-  .female-stepper .step-btn.plus:hover  { background:rgba(255,159,243,0.18); color:var(--female-col); }
-  .female-stepper .step-btn.minus:hover { background:rgba(255,159,243,0.10); color:var(--female-col); }
 
-  .step-display {
-    width:100%; background:none; border:none; outline:none;
-    font-size:2rem; font-family:'Playfair Display',serif; font-weight:500; color:white;
-    text-align:center; padding:10px 4px; -moz-appearance:textfield; cursor:default;
-  }
-  .step-display::-webkit-inner-spin-button, .step-display::-webkit-outer-spin-button { -webkit-appearance:none; }
-  .male-stepper   .step-display { color:var(--male-col); }
-  .female-stepper .step-display { color:var(--female-col); }
+/* ============================================================
+   SURVEYOR GATE (Login Screen)
+   ============================================================ */
 
-  @keyframes pop {
-    0%  { transform:scale(1); }
-    30% { transform:scale(0.78); }
-    65% { transform:scale(1.16); }
-    100%{ transform:scale(1); }
-  }
-  .step-btn.pop { animation:pop 0.24s cubic-bezier(.36,.07,.19,.97) both; }
+#surveyor-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(10, 22, 40, 0.65);
+  backdrop-filter: blur(8px);
+}
 
-  /* ── ORIGIN FIELD ── */
-  .field-full { margin-bottom:16px; }
-  .field-full > label { display:block; font-size:0.7rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; color:var(--text-dim); margin-bottom:8px; }
-  .origin-group { display:flex; gap:8px; align-items:stretch; }
-  .radio-pills { display:flex; gap:6px; flex-shrink:0; }
-  .radio-pills input[type="radio"] { display:none; }
-  .radio-pills label { padding:10px 12px; border-radius:10px; border:1px solid rgba(255,255,255,0.16); font-size:0.8rem; font-weight:500; cursor:pointer; transition:all 0.18s; background:rgba(255,255,255,0.06); white-space:nowrap; color:var(--text-mid); }
-  .radio-pills input:checked + label { background:rgba(0,229,195,0.18); border-color:rgba(0,229,195,0.5); color:var(--accent-teal); }
-  #country-field { flex:1; }
-  #country-input { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.16); border-radius:10px; padding:10px 12px; font-size:0.9rem; font-family:'Outfit',sans-serif; color:white; width:100%; transition:border-color 0.2s,background 0.2s; }
-  #country-input::placeholder { color:rgba(255,255,255,0.25); }
-  #country-input:focus { outline:none; border-color:var(--accent-teal); background:rgba(255,255,255,0.12); }
-  #country-input:disabled { opacity:0.3; cursor:not-allowed; }
+.gate-card {
+  background: rgba(255, 255, 255, 0.10);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  border-radius: 28px;
+  padding: 40px 28px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: var(--glass-shadow);
+  text-align: center;
+  animation: fadeUp 0.4s ease both;
+}
 
-  .error-msg { color:var(--accent-coral); font-size:0.77rem; margin-bottom:12px; display:none; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-  .btn-row { display:flex; gap:8px; margin-top:4px; }
-  .btn-add { flex:1; background:linear-gradient(135deg,var(--accent-teal),#00aaff); color:#0a1628; border:none; border-radius:11px; padding:14px; font-size:0.95rem; font-weight:700; font-family:'Outfit',sans-serif; cursor:pointer; transition:opacity 0.2s,transform 0.1s; }
-  .btn-add:active { opacity:0.85; transform:scale(0.98); }
-  .btn-cancel { background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.15); color:var(--text-dim); border-radius:11px; padding:14px 16px; font-size:0.95rem; font-weight:600; font-family:'Outfit',sans-serif; cursor:pointer; display:none; transition:background 0.2s; }
-  .btn-cancel:hover { background:rgba(255,255,255,0.12); }
+.gate-icon {
+  font-size: 3rem;
+  margin-bottom: 14px;
+}
 
-  /* ── LOG TABLE ── */
-  .log-section { padding:0 16px 80px; }
-  .log-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-  .log-header-left h2 { font-family:'Playfair Display',serif; font-size:1.05rem; font-weight:500; color:var(--text-bright); }
-  .log-header-left .log-meta { font-size:0.72rem; color:var(--text-dim); margin-top:2px; }
-  .log-header-right { display:flex; gap:8px; align-items:center; }
-  .btn-clear { background:rgba(255,107,107,0.1); border:1px solid rgba(255,107,107,0.35); color:var(--accent-coral); border-radius:8px; padding:6px 13px; font-size:0.78rem; font-family:'Outfit',sans-serif; cursor:pointer; font-weight:600; transition:background 0.2s; }
-  .btn-clear:hover { background:rgba(255,107,107,0.2); }
+.gate-card h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.9rem;
+  font-weight: 500;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+}
 
-  .table-wrap { background:rgba(255,255,255,0.07); border:1px solid var(--glass-border); backdrop-filter:blur(16px); border-radius:18px; overflow-x:auto; box-shadow:var(--glass-shadow); }
-  table { width:100%; border-collapse:collapse; min-width:500px; }
-  thead tr { background:rgba(255,255,255,0.06); border-bottom:1px solid rgba(255,255,255,0.1); }
-  th { padding:12px 8px; font-size:0.67rem; font-weight:600; text-transform:uppercase; letter-spacing:0.07em; text-align:center; color:var(--text-dim); white-space:nowrap; }
-  th:first-child { text-align:left; padding-left:14px; }
-  tbody tr { border-bottom:1px solid rgba(255,255,255,0.06); transition:background 0.15s; }
-  tbody tr:last-child { border-bottom:none; }
-  tbody tr:hover { background:rgba(255,255,255,0.05); }
-  tbody tr.editing-row { background:rgba(255,209,102,0.07); outline:1px solid rgba(255,209,102,0.35); outline-offset:-1px; }
-  td { padding:12px 8px; font-size:0.85rem; text-align:center; color:var(--text-mid); }
-  td:first-child { text-align:left; padding-left:14px; font-weight:600; font-size:0.76rem; color:var(--text-dim); }
-  td.male-val   { color:var(--male-col);   font-weight:600; }
-  td.female-val { color:var(--female-col); font-weight:600; }
-  td.total-val  { color:var(--accent-teal); font-weight:700; font-size:0.95rem; }
-  .country-tag { display:inline-block; background:rgba(0,229,195,0.12); border:1px solid rgba(0,229,195,0.28); color:var(--accent-teal); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; }
-  .local-tag { color:rgba(255,255,255,0.3); font-size:0.78rem; }
-  .surveyor-tag { display:inline-block; background:rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.14); color:var(--text-mid); border-radius:6px; padding:2px 8px; font-size:0.72rem; font-weight:600; letter-spacing:0.04em; }
-  .action-btns { display:flex; gap:4px; justify-content:center; }
-  .btn-edit,.btn-del { background:none; border:none; cursor:pointer; padding:5px 7px; border-radius:7px; font-size:0.82rem; transition:background 0.15s; }
-  .btn-edit:hover { background:rgba(255,209,102,0.15); }
-  .btn-del:hover  { background:rgba(255,107,107,0.15); }
-  .empty-state { text-align:center; padding:36px 16px; color:var(--text-dim); font-size:0.9rem; }
-  .empty-state span { display:block; font-size:2.2rem; margin-bottom:8px; opacity:0.6; }
+.gate-card .sub {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-bottom: 28px;
+}
 
-  /* ── MODALS ── */
-  .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); backdrop-filter:blur(6px); display:none; align-items:flex-end; justify-content:center; z-index:500; padding:16px; }
-  .modal-overlay.active { display:flex; }
-  .modal { background:rgba(20,35,65,0.92); border:1px solid var(--glass-border); backdrop-filter:blur(30px); border-radius:22px; width:100%; max-width:440px; padding:26px; animation:slideUp 0.22s ease; box-shadow:var(--glass-shadow); }
-  @keyframes slideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
-  .modal h3 { font-family:'Playfair Display',serif; font-size:1.15rem; font-weight:400; color:var(--text-bright); margin-bottom:6px; }
-  .modal p  { font-size:0.82rem; color:var(--text-dim); margin-bottom:20px; }
-  .modal-btns { display:flex; gap:8px; }
-  .modal-btns button { flex:1; padding:12px; border-radius:11px; border:none; font-size:0.9rem; font-weight:600; font-family:'Outfit',sans-serif; cursor:pointer; transition:opacity 0.2s; }
-  .modal-btns button:active { opacity:0.8; }
-  .modal-confirm    { background:linear-gradient(135deg,var(--accent-coral),#c0392b); color:white; }
-  .modal-cancel-btn { background:rgba(255,255,255,0.1); color:var(--text-mid); }
+.gate-input-wrap {
+  position: relative;
+  margin-bottom: 12px;
+}
 
-  .glow-line { height:1px; background:linear-gradient(90deg,transparent,rgba(0,229,195,0.4),transparent); margin:0 16px 14px; }
+.gate-input-wrap span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1rem;
+  opacity: 0.6;
+}
 
-  /* ── TOAST ── */
-  #toast {
-    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(80px);
-    background:rgba(18,32,58,0.96); border:1px solid rgba(255,255,255,0.18);
-    backdrop-filter:blur(20px); border-radius:12px; padding:11px 22px;
-    font-size:0.85rem; color:var(--text-bright); z-index:9999;
-    transition:transform 0.3s ease,opacity 0.3s ease; opacity:0; white-space:nowrap;
-    box-shadow:0 6px 30px rgba(0,0,0,0.4);
-  }
-  #toast.show { transform:translateX(-50%) translateY(0); opacity:1; }
+.gate-card input {
+  width: 100%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 12px;
+  padding: 14px 14px 14px 40px;
+  font-size: 1rem;
+  font-family: 'Outfit', sans-serif;
+  color: white;
+  letter-spacing: 0.06em;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.gate-card input::placeholder { color: rgba(255, 255, 255, 0.3); }
+
+.gate-card input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+  background: rgba(255, 255, 255, 0.13);
+}
+
+.gate-error {
+  color: var(--accent-coral);
+  font-size: 0.78rem;
+  margin-bottom: 10px;
+  display: none;
+}
+
+.gate-btn {
+  width: 100%;
+  background: linear-gradient(135deg, var(--accent-teal), #00aaff);
+  color: #0a1628;
+  border: none;
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.gate-btn:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.switch-panel {
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.switch-panel p {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.surveyor-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: center;
+}
+
+.s-pill {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 20px;
+  padding: 5px 13px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-mid);
+  transition: all 0.18s;
+}
+
+.s-pill:hover {
+  background: rgba(0, 229, 195, 0.2);
+  border-color: var(--accent-teal);
+  color: var(--accent-teal);
+}
+
+
+/* ============================================================
+   MAIN LAYOUT
+   ============================================================ */
+
+.main {
+  position: relative;
+  z-index: 1;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+
+header {
+  background: rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--glass-border);
+  backdrop-filter: blur(24px);
+  padding: 14px 18px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+header h1 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--text-bright);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-date {
+  font-size: 0.73rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+}
+
+/* Surveyor Badge */
+
+.surveyor-badge {
+  background: rgba(0, 229, 195, 0.15);
+  border: 1px solid rgba(0, 229, 195, 0.4);
+  border-radius: 20px;
+  padding: 5px 13px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--accent-teal);
+  transition: background 0.2s;
+}
+
+.surveyor-badge:hover { background: rgba(0, 229, 195, 0.25); }
+
+.surveyor-badge .dot {
+  width: 6px;
+  height: 6px;
+  background: var(--accent-teal);
+  border-radius: 50%;
+  box-shadow: 0 0 6px var(--accent-teal);
+}
+
+/* Export Button */
+
+.btn-export {
+  background: rgba(255, 209, 102, 0.14);
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  border-radius: 10px;
+  padding: 6px 12px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  color: var(--accent-gold);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  transition: all 0.18s;
+}
+
+.btn-export:hover  { background: rgba(255, 209, 102, 0.25); }
+.btn-export:active { transform: scale(0.95); }
+
+.btn-export.busy {
+  opacity: 0.55;
+  cursor: wait;
+  pointer-events: none;
+}
+
+
+/* ============================================================
+   TABS
+   ============================================================ */
+
+.tabs-section {
+  padding: 14px 16px 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+
+.tabs-section::-webkit-scrollbar { display: none; }
+
+.tabs-row {
+  display: inline-flex;
+  gap: 6px;
+  padding-bottom: 1px;
+}
+
+.tab-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px 10px 0 0;
+  padding: 8px 15px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-dim);
+  cursor: pointer;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s;
+}
+
+.tab-btn.active {
+  background: rgba(0, 229, 195, 0.15);
+  border-color: rgba(0, 229, 195, 0.45);
+  border-bottom-color: transparent;
+  color: var(--accent-teal);
+}
+
+.tab-btn .tab-count {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 0.7rem;
+}
+
+.tab-btn.active .tab-count { background: rgba(0, 229, 195, 0.2); }
+
+.tab-all.active {
+  background: rgba(255, 209, 102, 0.15);
+  border-color: rgba(255, 209, 102, 0.4);
+  color: var(--accent-gold);
+}
+
+
+/* ============================================================
+   STATS BAR
+   ============================================================ */
+
+.stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid rgba(0, 229, 195, 0.2);
+  border-bottom: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(10px);
+}
+
+.stat-chip {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(10px);
+  border-radius: 14px;
+  padding: 12px 8px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.stat-chip:hover { transform: translateY(-2px); }
+
+.stat-chip .val {
+  font-size: 1.7rem;
+  font-family: 'Playfair Display', serif;
+  line-height: 1;
+}
+
+.stat-chip .lbl {
+  font-size: 0.67rem;
+  color: var(--text-dim);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+
+.stat-chip.total  .val { color: var(--accent-teal);   text-shadow: 0 0 18px rgba(0,   229, 195, 0.50); }
+.stat-chip.male   .val { color: var(--male-col);       text-shadow: 0 0 18px rgba(116, 185, 255, 0.45); }
+.stat-chip.female .val { color: var(--female-col);     text-shadow: 0 0 18px rgba(255, 159, 243, 0.45); }
+
+
+/* ============================================================
+   FORM CARD
+   ============================================================ */
+
+.form-section { padding: 16px; }
+
+.form-card {
+  background: rgba(255, 255, 255, 0.09);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: var(--glass-blur);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--glass-shadow);
+}
+
+.form-card h2 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: var(--text-bright);
+  margin-bottom: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.edit-indicator {
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 600;
+  background: rgba(255, 209, 102, 0.2);
+  border: 1px solid rgba(255, 209, 102, 0.4);
+  color: var(--accent-gold);
+  padding: 3px 10px;
+  border-radius: 20px;
+  display: none;
+}
+
+
+/* ============================================================
+   COUNTER ROW & STEPPERS
+   ============================================================ */
+
+.counter-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1.4fr;
+  gap: 10px;
+  margin-bottom: 16px;
+  align-items: start;
+}
+
+/* Total Field */
+
+.total-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.total-field label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  text-align: center;
+}
+
+.total-field input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  font-size: 1.5rem;
+  font-family: 'Playfair Display', serif;
+  color: var(--accent-teal);
+  width: 100%;
+  text-align: center;
+  padding: 14px 6px;
+  -moz-appearance: textfield;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.total-field input::placeholder {
+  color: rgba(0, 229, 195, 0.25);
+  font-size: 1rem;
+}
+
+.total-field input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+  background: rgba(0, 229, 195, 0.06);
+}
+
+.total-field input::-webkit-inner-spin-button,
+.total-field input::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+/* Stepper Card */
+
+.stepper-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stepper-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  text-align: center;
+}
+
+.stepper-label.male-lbl   { color: var(--male-col); }
+.stepper-label.female-lbl { color: var(--female-col); }
+
+.stepper-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  overflow: hidden;
+  transition: border-color 0.2s, box-shadow 0.25s;
+}
+
+.stepper-body.male-stepper   { border-color: rgba(116, 185, 255, 0.28); }
+.stepper-body.female-stepper { border-color: rgba(255, 159, 243, 0.28); }
+
+.stepper-body.male-stepper:focus-within {
+  border-color: var(--male-col);
+  box-shadow: 0 0 18px rgba(116, 185, 255, 0.22);
+}
+
+.stepper-body.female-stepper:focus-within {
+  border-color: var(--female-col);
+  box-shadow: 0 0 18px rgba(255, 159, 243, 0.22);
+}
+
+/* Step Buttons */
+
+.step-btn {
+  width: 100%;
+  border: none;
+  cursor: pointer;
+  padding: 11px 0;
+  font-size: 1.5rem;
+  line-height: 1;
+  font-weight: 300;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.5);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+  touch-action: manipulation;
+  transition: background 0.15s, color 0.15s;
+}
+
+.step-btn:active { filter: brightness(1.4); }
+
+.step-btn.plus  { border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
+.step-btn.minus { border-top:    1px solid rgba(255, 255, 255, 0.08); }
+
+.male-stepper   .step-btn.plus:hover  { background: rgba(116, 185, 255, 0.18); color: var(--male-col); }
+.male-stepper   .step-btn.minus:hover { background: rgba(116, 185, 255, 0.10); color: var(--male-col); }
+.female-stepper .step-btn.plus:hover  { background: rgba(255, 159, 243, 0.18); color: var(--female-col); }
+.female-stepper .step-btn.minus:hover { background: rgba(255, 159, 243, 0.10); color: var(--female-col); }
+
+/* Step Display (number input) */
+
+.step-display {
+  width: 100%;
+  background: none;
+  border: none;
+  outline: none;
+  font-size: 2rem;
+  font-family: 'Playfair Display', serif;
+  font-weight: 500;
+  color: white;
+  text-align: center;
+  padding: 10px 4px;
+  -moz-appearance: textfield;
+  cursor: default;
+}
+
+.step-display::-webkit-inner-spin-button,
+.step-display::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+.male-stepper   .step-display { color: var(--male-col); }
+.female-stepper .step-display { color: var(--female-col); }
+
+@keyframes pop {
+  0%   { transform: scale(1); }
+  30%  { transform: scale(0.78); }
+  65%  { transform: scale(1.16); }
+  100% { transform: scale(1); }
+}
+
+.step-btn.pop { animation: pop 0.24s cubic-bezier(.36, .07, .19, .97) both; }
+
+
+/* ============================================================
+   ORIGIN FIELD
+   ============================================================ */
+
+.field-full { margin-bottom: 16px; }
+
+.field-full > label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-dim);
+  margin-bottom: 8px;
+}
+
+.origin-group {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+  flex-wrap: wrap;
+}
+
+/* Radio Pills */
+
+.radio-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.radio-pills input[type="radio"] { display: none; }
+
+.radio-pills label {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.06);
+  white-space: nowrap;
+  color: var(--text-mid);
+  transition: all 0.18s;
+}
+
+.radio-pills input:checked       + label { background: rgba(0,   229, 195, 0.18); border-color: rgba(0,   229, 195, 0.5); color: var(--accent-teal); }
+#r-municipality:checked          + label { background: rgba(192, 132, 252, 0.18); border-color: rgba(192, 132, 252, 0.5); color: var(--accent-purple); }
+#r-abroad:checked                + label { background: rgba(255, 209, 102, 0.18); border-color: rgba(255, 209, 102, 0.5); color: var(--accent-gold); }
+
+/* Place Text Input */
+
+.place-input-wrap { flex: 1; min-width: 140px; }
+
+.place-input-wrap input {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 0.9rem;
+  font-family: 'Outfit', sans-serif;
+  color: white;
+  width: 100%;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.place-input-wrap input::placeholder { color: rgba(255, 255, 255, 0.25); }
+
+.place-input-wrap input:focus {
+  outline: none;
+  border-color: var(--accent-teal);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.place-input-wrap input:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+
+/* ============================================================
+   FORM BUTTONS
+   ============================================================ */
+
+.error-msg {
+  color: var(--accent-coral);
+  font-size: 0.77rem;
+  margin-bottom: 12px;
+  display: none;
+}
+
+.btn-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.btn-add {
+  flex: 1;
+  background: linear-gradient(135deg, var(--accent-teal), #00aaff);
+  color: #0a1628;
+  border: none;
+  border-radius: 11px;
+  padding: 14px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.1s;
+}
+
+.btn-add:active {
+  opacity: 0.85;
+  transform: scale(0.98);
+}
+
+.btn-cancel {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--text-dim);
+  border-radius: 11px;
+  padding: 14px 16px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  display: none;
+  transition: background 0.2s;
+}
+
+.btn-cancel:hover { background: rgba(255, 255, 255, 0.12); }
+
+
+/* ============================================================
+   LOG SECTION
+   ============================================================ */
+
+.log-section { padding: 0 16px 80px; }
+
+/* Section Toggle Tabs */
+
+.section-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+
+.section-tab {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  padding: 7px 14px;
+  font-size: 0.79rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text-dim);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.18s;
+}
+
+.section-tab.active-local   { background: rgba(0,   229, 195, 0.15); border-color: rgba(0,   229, 195, 0.45); color: var(--accent-teal); }
+.section-tab.active-muni    { background: rgba(192, 132, 252, 0.15); border-color: rgba(192, 132, 252, 0.45); color: var(--accent-purple); }
+.section-tab.active-foreign { background: rgba(255, 209, 102, 0.15); border-color: rgba(255, 209, 102, 0.45); color: var(--accent-gold); }
+
+.section-tab .stab-count {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 20px;
+  padding: 1px 7px;
+  font-size: 0.7rem;
+}
+
+/* Log Block */
+
+.log-block { margin-bottom: 24px; }
+.log-block.hidden { display: none; }
+
+.log-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.log-block-left h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1rem;
+  font-weight: 500;
+  color: var(--text-bright);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.log-block-left .log-meta {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+/* Log Block Pills */
+
+.log-block-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  border-radius: 20px;
+  padding: 4px 12px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+.pill-local   { background: rgba(0,   229, 195, 0.12); border-color: rgba(0,   229, 195, 0.35); color: var(--accent-teal); }
+.pill-muni    { background: rgba(192, 132, 252, 0.12); border-color: rgba(192, 132, 252, 0.35); color: var(--accent-purple); }
+.pill-foreign { background: rgba(255, 209, 102, 0.12); border-color: rgba(255, 209, 102, 0.35); color: var(--accent-gold); }
+
+/* Log Block Right Actions */
+
+.log-block-header-right {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.btn-clear {
+  background: rgba(255, 107, 107, 0.1);
+  border: 1px solid rgba(255, 107, 107, 0.35);
+  color: var(--accent-coral);
+  border-radius: 8px;
+  padding: 6px 13px;
+  font-size: 0.78rem;
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-clear:hover { background: rgba(255, 107, 107, 0.2); }
+
+
+/* ============================================================
+   TABLE
+   ============================================================ */
+
+.table-wrap {
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(16px);
+  border-radius: 18px;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 400px;
+  box-shadow: var(--glass-shadow);
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 460px;
+}
+
+thead tr {
+  background: rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+th {
+  padding: 12px 8px;
+  font-size: 0.67rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  text-align: center;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+th:first-child {
+  text-align: left;
+  padding-left: 14px;
+}
+
+tbody tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  transition: background 0.15s;
+}
+
+tbody tr:last-child { border-bottom: none; }
+tbody tr:hover      { background: rgba(255, 255, 255, 0.05); }
+
+tbody tr.editing-row {
+  background: rgba(255, 209, 102, 0.07);
+  outline: 1px solid rgba(255, 209, 102, 0.35);
+  outline-offset: -1px;
+}
+
+td {
+  padding: 12px 8px;
+  font-size: 0.85rem;
+  text-align: center;
+  color: var(--text-mid);
+}
+
+td:first-child {
+  text-align: left;
+  padding-left: 14px;
+  font-weight: 600;
+  font-size: 0.76rem;
+  color: var(--text-dim);
+}
+
+td.male-val   { color: var(--male-col);    font-weight: 600; }
+td.female-val { color: var(--female-col);  font-weight: 600; }
+td.total-val  { color: var(--accent-teal); font-weight: 700; font-size: 0.95rem; }
+
+td.total-val.muni-val    { color: var(--accent-purple); }
+td.total-val.foreign-val { color: var(--accent-gold); }
+
+/* Tags */
+
+.place-tag {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.place-tag.local-tag   { background: rgba(0,   229, 195, 0.12); border: 1px solid rgba(0,   229, 195, 0.28); color: var(--accent-teal); }
+.place-tag.muni-tag    { background: rgba(192, 132, 252, 0.12); border: 1px solid rgba(192, 132, 252, 0.28); color: var(--accent-purple); }
+.place-tag.foreign-tag { background: rgba(255, 209, 102, 0.12); border: 1px solid rgba(255, 209, 102, 0.28); color: var(--accent-gold); }
+
+.surveyor-tag {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: var(--text-mid);
+  border-radius: 6px;
+  padding: 2px 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+/* Action Buttons */
+
+.action-btns {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+}
+
+.btn-edit,
+.btn-del {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 5px 7px;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  transition: background 0.15s;
+}
+
+.btn-edit:hover { background: rgba(255, 209, 102, 0.15); }
+.btn-del:hover  { background: rgba(255, 107, 107, 0.15); }
+
+/* Empty State */
+
+.empty-state {
+  text-align: center;
+  padding: 30px 16px;
+  color: var(--text-dim);
+  font-size: 0.88rem;
+}
+
+.empty-state span {
+  display: block;
+  font-size: 2rem;
+  margin-bottom: 8px;
+  opacity: 0.5;
+}
+
+
+/* ============================================================
+   MODALS
+   ============================================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 500;
+  padding: 16px;
+}
+
+.modal-overlay.active { display: flex; }
+
+.modal {
+  background: rgba(20, 35, 65, 0.92);
+  border: 1px solid var(--glass-border);
+  backdrop-filter: blur(30px);
+  border-radius: 22px;
+  width: 100%;
+  max-width: 440px;
+  padding: 26px;
+  box-shadow: var(--glass-shadow);
+  animation: slideUp 0.22s ease;
+}
+
+@keyframes slideUp {
+  from { transform: translateY(40px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+.modal h3 {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.15rem;
+  font-weight: 400;
+  color: var(--text-bright);
+  margin-bottom: 6px;
+}
+
+.modal p {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  margin-bottom: 20px;
+}
+
+.modal-btns { display: flex; gap: 8px; }
+
+.modal-btns button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 11px;
+  border: none;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.modal-btns button:active { opacity: 0.8; }
+
+.modal-confirm    { background: linear-gradient(135deg, var(--accent-coral), #c0392b); color: white; }
+.modal-cancel-btn { background: rgba(255, 255, 255, 0.1); color: var(--text-mid); }
+
+
+/* ============================================================
+   EXPORT MODAL
+   ============================================================ */
+
+.export-scope-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.scope-opt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.scope-opt:hover { background: rgba(255, 209, 102, 0.1); border-color: rgba(255, 209, 102, 0.35); }
+
+.scope-opt input[type=radio] {
+  accent-color: var(--accent-gold);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.scope-opt:has(input:checked) {
+  border-color: rgba(255, 209, 102, 0.5);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.scope-title {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-bright);
+}
+
+.scope-desc {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  margin-top: 2px;
+}
+
+.btn-export-go {
+  flex: 1;
+  background: linear-gradient(135deg, #f0b429, #d4901a);
+  color: #1a0e00;
+  border: none;
+  border-radius: 11px;
+  padding: 13px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-export-go:active { opacity: 0.85; }
+
+.fmt-btn {
+  flex: 1;
+  padding: 9px 10px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Outfit', sans-serif;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  transition: all 0.18s;
+}
+
+.fmt-btn.active {
+  background: rgba(255, 209, 102, 0.18);
+  border-color: rgba(255, 209, 102, 0.5);
+  color: var(--accent-gold);
+}
+
+
+/* ============================================================
+   MISC
+   ============================================================ */
+
+.glow-line {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(0, 229, 195, 0.4), transparent);
+  margin: 0 16px 14px;
+}
+
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: rgba(18, 32, 58, 0.96);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(20px);
+  border-radius: 12px;
+  padding: 11px 22px;
+  font-size: 0.85rem;
+  color: var(--text-bright);
+  z-index: 9999;
+  opacity: 0;
+  white-space: nowrap;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.4);
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+#toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
 </style>
 </head>
 <body>
-
 <div class="bg-canvas">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
+  <div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div>
 </div>
-
 <div id="toast"></div>
 
-<!-- ── SURVEYOR GATE ── -->
+<!-- GATE sa landing page -->
 <div id="surveyor-gate">
   <div class="gate-card">
     <div class="gate-icon">🌿</div>
     <h2>TourLista</h2>
-    <p class="sub">To create a new Logbook:<br>Enter A new logbook name <br>To open an existing Logbook <br>Enter thye existing name of Logbook</p>
+    <p class="sub">Enter a new logbook name to create one,<br>or an existing name to open it.</p>
     <div class="gate-input-wrap">
       <span>🪪</span>
       <input type="text" id="gate-input" placeholder="e.g. current date or your name" maxlength="20" autocomplete="off">
@@ -369,13 +1274,13 @@
   </div>
 </div>
 
-<!-- ── MAIN ── -->
+<!-- MAIN page hindi landing page -->
 <div class="main">
   <header>
     <div class="header-row">
       <h1>🌿 Visitor Log</h1>
       <div class="header-actions">
-        <button class="btn-export" id="btn-export" onclick="openExportModal()">📄 Export Word</button>
+        <button class="btn-export" id="btn-export" onclick="openExportModal()">📄 Export</button>
         <div class="surveyor-badge" onclick="switchSurveyor()" title="Switch surveyor">
           <div class="dot"></div>
           <span id="surveyor-display">—</span>
@@ -391,27 +1296,24 @@
 
   <div class="stats-bar">
     <div class="stat-chip total"><div class="val" id="stat-total">0</div><div class="lbl">Total</div></div>
-    <div class="stat-chip male" ><div class="val" id="stat-male">0</div><div class="lbl">Male</div></div>
+    <div class="stat-chip male"><div class="val" id="stat-male">0</div><div class="lbl">Male</div></div>
     <div class="stat-chip female"><div class="val" id="stat-female">0</div><div class="lbl">Female</div></div>
   </div>
 
   <div class="glow-line"></div>
 
-  <!-- FORM -->
+  <!--Mag Add ng ENTRY FORM -->
   <div class="form-section">
     <div class="form-card">
       <h2>
         <span id="form-title">Add Entry</span>
         <span class="edit-indicator" id="edit-indicator">Editing #<span id="edit-num"></span></span>
       </h2>
-
       <div class="counter-row">
-        <!-- Total -->
         <div class="total-field">
           <label>Total</label>
           <input type="number" id="inp-total" min="0" placeholder="0">
         </div>
-        <!-- Male stepper -->
         <div class="stepper-card">
           <div class="stepper-label male-lbl">♂ Male</div>
           <div class="stepper-body male-stepper">
@@ -420,7 +1322,6 @@
             <button type="button" class="step-btn minus" onclick="step('inp-male',-1,this)">－</button>
           </div>
         </div>
-        <!-- Female stepper -->
         <div class="stepper-card">
           <div class="stepper-label female-lbl">♀ Female</div>
           <div class="stepper-body female-stepper">
@@ -430,7 +1331,6 @@
           </div>
         </div>
       </div>
-
       <div id="count-error" class="error-msg">⚠ Male + Female must equal Total</div>
 
       <div class="field-full">
@@ -438,82 +1338,131 @@
         <div class="origin-group">
           <div class="radio-pills">
             <input type="radio" name="origin" id="r-local" value="local" checked>
-            <label for="r-local">Local</label>
+            <label for="r-local">🏠 Local</label>
+            <input type="radio" name="origin" id="r-municipality" value="municipality">
+            <label for="r-municipality">🗺 Other Municipality</label>
             <input type="radio" name="origin" id="r-abroad" value="abroad">
-            <label for="r-abroad">Other Country</label>
+            <label for="r-abroad">🌍 Other Country</label>
           </div>
-          <div id="country-field">
-            <input type="text" id="country-input" placeholder="Country name" disabled>
+          <div class="place-input-wrap" id="place-input-wrap">
+            <input type="text" id="place-input" placeholder="Municipality or country name" disabled>
           </div>
         </div>
       </div>
 
       <div class="btn-row">
         <button class="btn-cancel" id="btn-cancel" onclick="cancelEdit()">Cancel</button>
-        <button class="btn-add"    id="btn-submit" onclick="submitEntry()">+ Add to Log</button>
+        <button class="btn-add" id="btn-submit" onclick="submitEntry()">+ Add to Log</button>
       </div>
     </div>
   </div>
 
-  <!-- LOG -->
+  <!-- LOG TABLES -->
   <div class="log-section">
-    <div class="log-header">
-      <div class="log-header-left">
-        <h2 id="log-title">Today's Log</h2>
-        <div class="log-meta" id="log-meta"></div>
-      </div>
-      <div class="log-header-right">
-        <button class="btn-clear" onclick="confirmClear()">Clear All</button>
-      </div>
+
+    <!-- Section visibility toggles -->
+    <div class="section-tabs">
+      <button class="section-tab active-local" id="stab-local" onclick="toggleSection('local')">
+        🏠 Local <span class="stab-count" id="stab-count-local">0</span>
+      </button>
+      <button class="section-tab active-muni" id="stab-muni" onclick="toggleSection('muni')">
+        🗺 Other Municipalities <span class="stab-count" id="stab-count-muni">0</span>
+      </button>
+      <button class="section-tab active-foreign" id="stab-foreign" onclick="toggleSection('foreign')">
+        🌍 Foreign / Other Country <span class="stab-count" id="stab-count-foreign">0</span>
+      </button>
     </div>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
+
+    <!-- LOCAL TABLE -->
+    <div class="log-block" id="block-local">
+      <div class="log-block-header">
+        <div class="log-block-left">
+          <h3><span class="log-block-pill pill-local">🏠 Local Visitors</span></h3>
+          <div class="log-meta" id="meta-local"></div>
+        </div>
+        <div class="log-block-header-right">
+          <button class="btn-clear" onclick="confirmClearType('local')">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
             <th>#</th><th>Total</th><th>♂ Male</th><th>♀ Female</th>
-            <th>From</th><th>Surveyor</th><th>Time</th><th>Actions</th>
-          </tr>
-        </thead>
-        <tbody id="log-body"></tbody>
-      </table>
+            <th>Surveyor</th><th>Time</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody-local"></tbody>
+        </table>
+      </div>
     </div>
-  </div>
-</div>
+
+    <!-- MUNICIPALITY TABLE -->
+    <div class="log-block" id="block-muni">
+      <div class="log-block-header">
+        <div class="log-block-left">
+          <h3><span class="log-block-pill pill-muni">🗺 Other Municipality Visitors</span></h3>
+          <div class="log-meta" id="meta-muni"></div>
+        </div>
+        <div class="log-block-header-right">
+          <button class="btn-clear" onclick="confirmClearType('municipality')">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Total</th><th>♂ Male</th><th>♀ Female</th>
+            <th>Municipality</th><th>Surveyor</th><th>Time</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody-muni"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FOREIGN TABLE -->
+    <div class="log-block" id="block-foreign">
+      <div class="log-block-header">
+        <div class="log-block-left">
+          <h3><span class="log-block-pill pill-foreign">🌍 Foreign / Other Country Visitors</span></h3>
+          <div class="log-meta" id="meta-foreign"></div>
+        </div>
+        <div class="log-block-header-right">
+          <button class="btn-clear" onclick="confirmClearType('abroad')">Clear</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Total</th><th>♂ Male</th><th>♀ Female</th>
+            <th>Country</th><th>Surveyor</th><th>Time</th><th>Actions</th>
+          </tr></thead>
+          <tbody id="tbody-foreign"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /log-section -->
+</div><!-- /main -->
 
 <!-- EXPORT MODAL -->
 <div class="modal-overlay" id="export-modal">
   <div class="modal" style="max-width:460px">
     <h3>📤 Export Data</h3>
     <p>Choose a format and which entries to include:</p>
-
-    <!-- Format picker -->
     <div style="display:flex;gap:8px;margin-bottom:16px">
       <button class="fmt-btn active" id="fmt-docx" onclick="setFmt('docx')">📄 Word (.docx)</button>
       <button class="fmt-btn" id="fmt-csv" onclick="setFmt('csv')">📊 Spreadsheet (.csv)</button>
     </div>
-
-    <!-- Scope picker -->
     <div class="export-scope-options">
       <label class="scope-opt">
         <input type="radio" name="exp-scope" value="view" checked>
-        <div class="scope-text">
-          <div class="scope-title">Current View</div>
-          <div class="scope-desc">Entries shown in the active tab</div>
-        </div>
+        <div class="scope-text"><div class="scope-title">Current View</div><div class="scope-desc">Entries shown in the active tab</div></div>
       </label>
       <label class="scope-opt">
         <input type="radio" name="exp-scope" value="mine">
-        <div class="scope-text">
-          <div class="scope-title">My Entries — <span id="exp-my-id" style="color:var(--accent-teal)"></span></div>
-          <div class="scope-desc">Only entries logged by you</div>
-        </div>
+        <div class="scope-text"><div class="scope-title">My Entries — <span id="exp-my-id" style="color:var(--accent-teal)"></span></div><div class="scope-desc">Only entries logged by you</div></div>
       </label>
       <label class="scope-opt">
         <input type="radio" name="exp-scope" value="all">
-        <div class="scope-text">
-          <div class="scope-title">All Surveyors</div>
-          <div class="scope-desc">Every entry from all surveyors</div>
-        </div>
+        <div class="scope-text"><div class="scope-title">All Surveyors</div><div class="scope-desc">Every entry from all surveyors</div></div>
       </label>
     </div>
     <div class="modal-btns">
@@ -527,10 +1476,10 @@
 <div class="modal-overlay" id="delete-modal">
   <div class="modal">
     <h3>Delete Entry?</h3>
-    <p>This will permanently remove entry #<span id="del-num"></span> from the log.</p>
+    <p>This will permanently remove this entry from the log.</p>
     <div class="modal-btns">
       <button class="modal-cancel-btn" onclick="closeDeleteModal()">Keep it</button>
-      <button class="modal-confirm"    onclick="confirmDelete()">Delete</button>
+      <button class="modal-confirm" onclick="confirmDelete()">Delete</button>
     </div>
   </div>
 </div>
@@ -538,36 +1487,42 @@
 <!-- CLEAR MODAL -->
 <div class="modal-overlay" id="clear-modal">
   <div class="modal">
-    <h3>⚠ Clear All Entries?</h3>
-    <p id="clear-modal-desc">This will permanently delete all entries in the current view from your browser. <strong style="color:var(--accent-gold)">Export first to keep a backup.</strong></p>
+    <h3>⚠ Clear Entries?</h3>
+    <p id="clear-modal-desc">This will permanently delete entries. <strong style="color:var(--accent-gold)">Export first to keep a backup.</strong></p>
     <div class="modal-btns" style="flex-direction:column;gap:8px">
       <button class="btn-export-go" style="width:100%;padding:13px;font-size:0.9rem" onclick="exportThenClear()">📤 Export &amp; Clear</button>
       <div style="display:flex;gap:8px">
         <button class="modal-cancel-btn" onclick="closeClearModal()">Cancel</button>
-        <button class="modal-confirm"    onclick="doClearAll()">Clear Without Exporting</button>
+        <button class="modal-confirm" onclick="doClearType()">Clear Without Exporting</button>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-/* ═══════════════════════════════════════════
-   STATE
-═══════════════════════════════════════════ */
-let entries            = JSON.parse(localStorage.getItem('visitor-log-v2') || '[]');
-let currentSurveyor    = '';
-let activeTab          = 'all';
-let editingIndex       = null;
+let entries = JSON.parse(localStorage.getItem('visitor-log-v3') || '[]');
+let currentSurveyor = '';
+let activeTab = 'all';
+let editingIndex = null;
 let pendingDeleteIndex = null;
+let pendingClearType = null;
 
-function save() { localStorage.setItem('visitor-log-v2', JSON.stringify(entries)); }
+// section visibility state
+let sectionVisible = {local: true, muni: true, foreign: true};
+
+function save() { localStorage.setItem('visitor-log-v3', JSON.stringify(entries)); }
 function getSurveyors() { return [...new Set(entries.map(e => e.surveyor))].sort(); }
+
 function filteredEntries() {
-  if (activeTab === 'all') return entries.map((e,i) => ({...e,_idx:i}));
-  return entries.map((e,i) => ({...e,_idx:i})).filter(e => e.surveyor === activeTab);
+  let list = entries.map((e,i) => ({...e, _idx: i}));
+  if (activeTab !== 'all') list = list.filter(e => e.surveyor === activeTab);
+  return list;
 }
 
-/* ─── TOAST ─── */
+function getByType(type, base) {
+  return (base || filteredEntries()).filter(e => e.originType === type).reverse();
+}
+
 function toast(msg, ms=2800) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -575,11 +1530,10 @@ function toast(msg, ms=2800) {
   setTimeout(() => el.classList.remove('show'), ms);
 }
 
-/* ─── STEPPER ─── */
 function step(id, delta, btn) {
-  const inp  = document.getElementById(id);
+  const inp = document.getElementById(id);
   const next = Math.max(0, (parseInt(inp.value) || 0) + delta);
-  inp.value  = next > 0 ? next : '';
+  inp.value = next > 0 ? next : '';
   syncTotal();
   btn.classList.remove('pop');
   void btn.offsetWidth;
@@ -588,21 +1542,21 @@ function step(id, delta, btn) {
 }
 
 function syncTotal() {
-  const m = parseInt(document.getElementById('inp-male').value)   || 0;
+  const m = parseInt(document.getElementById('inp-male').value) || 0;
   const f = parseInt(document.getElementById('inp-female').value) || 0;
   document.getElementById('inp-total').value = (m+f) > 0 ? (m+f) : '';
   document.getElementById('count-error').style.display = 'none';
 }
 
-/* ─── GATE ─── */
+// GATE
 function signIn() {
   const val = document.getElementById('gate-input').value.trim();
-  if (!val) { document.getElementById('gate-error').style.display='block'; return; }
+  if (!val) { document.getElementById('gate-error').style.display = 'block'; return; }
   currentSurveyor = val.toUpperCase();
   activeTab = currentSurveyor;
   document.getElementById('surveyor-display').textContent = currentSurveyor;
-  document.getElementById('exp-my-id').textContent        = currentSurveyor;
-  document.getElementById('surveyor-gate').style.display  = 'none';
+  document.getElementById('exp-my-id').textContent = currentSurveyor;
+  document.getElementById('surveyor-gate').style.display = 'none';
   renderTabs(); render();
 }
 
@@ -621,7 +1575,7 @@ function showGate() {
 function renderSurveyorPills() {
   const sv = getSurveyors();
   const panel = document.getElementById('switch-panel');
-  if (!sv.length) { panel.style.display='none'; return; }
+  if (!sv.length) { panel.style.display = 'none'; return; }
   panel.style.display = 'block';
   document.getElementById('surveyor-pills').innerHTML =
     sv.map(s => `<span class="s-pill" onclick="quickSwitch('${s}')">${s}</span>`).join('');
@@ -631,176 +1585,252 @@ function quickSwitch(name) {
   currentSurveyor = name;
   activeTab = name;
   document.getElementById('surveyor-display').textContent = name;
-  document.getElementById('exp-my-id').textContent        = name;
-  document.getElementById('surveyor-gate').style.display  = 'none';
+  document.getElementById('exp-my-id').textContent = name;
+  document.getElementById('surveyor-gate').style.display = 'none';
   renderTabs(); render();
 }
 
-document.getElementById('gate-input').addEventListener('keydown', e => { if (e.key==='Enter') signIn(); });
+document.getElementById('gate-input').addEventListener('keydown', e => { if (e.key === 'Enter') signIn(); });
 
-/* ─── TABS ─── */
+// TABS
 function renderTabs() {
   const sv = getSurveyors();
   let html = `<button class="tab-btn tab-all ${activeTab==='all'?'active':''}" onclick="setTab('all')">
-    📋 All Surveyors <span class="tab-count">${entries.length}</span></button>`;
+    📋 All <span class="tab-count">${entries.length}</span></button>`;
   sv.forEach(s => {
-    const c = entries.filter(e=>e.surveyor===s).length;
+    const c = entries.filter(e => e.surveyor === s).length;
     html += `<button class="tab-btn ${activeTab===s?'active':''}" onclick="setTab('${s}')">
       🪪 ${s} <span class="tab-count">${c}</span></button>`;
   });
   document.getElementById('tabs-row').innerHTML = html;
 }
-function setTab(tab) { cancelEdit(); activeTab=tab; renderTabs(); render(); }
 
-/* ─── ORIGIN TOGGLE ─── */
+function setTab(tab) { cancelEdit(); activeTab = tab; renderTabs(); render(); }
+
+// ORIGIN TOGGLE
 document.querySelectorAll('input[name="origin"]').forEach(r => {
   r.addEventListener('change', () => {
-    const abroad = document.getElementById('r-abroad').checked;
-    const ci = document.getElementById('country-input');
-    ci.disabled = !abroad;
-    if (!abroad) ci.value=''; else ci.focus();
+    const val = document.querySelector('input[name="origin"]:checked').value;
+    const pi = document.getElementById('place-input');
+    if (val === 'local') {
+      pi.disabled = true; pi.value = '';
+      pi.placeholder = '';
+    } else if (val === 'municipality') {
+      pi.disabled = false; pi.value = '';
+      pi.placeholder = 'Municipality / City name'; pi.focus();
+    } else {
+      pi.disabled = false; pi.value = '';
+      pi.placeholder = 'Country name'; pi.focus();
+    }
   });
 });
 
-/* ─── SUBMIT ─── */
+// SUBMIT
 function submitEntry() {
-  const total   = parseInt(document.getElementById('inp-total').value)  || 0;
-  const male    = parseInt(document.getElementById('inp-male').value)   || 0;
-  const female  = parseInt(document.getElementById('inp-female').value) || 0;
-  const isAbroad = document.getElementById('r-abroad').checked;
-  const country  = document.getElementById('country-input').value.trim();
-  const err = document.getElementById('count-error');
+  const total  = parseInt(document.getElementById('inp-total').value) || 0;
+  const male   = parseInt(document.getElementById('inp-male').value) || 0;
+  const female = parseInt(document.getElementById('inp-female').value) || 0;
+  const originType = document.querySelector('input[name="origin"]:checked').value;
+  const place  = document.getElementById('place-input').value.trim();
+  const err    = document.getElementById('count-error');
 
-  if (total===0) { alert('Please enter at least 1 visitor.'); return; }
-  const mf = male+female;
-  if (mf>0 && mf!==total) { err.style.display='block'; return; }
+  if (total === 0) { alert('Please enter at least 1 visitor.'); return; }
+  const mf = male + female;
+  if (mf > 0 && mf !== total) { err.style.display = 'block'; return; }
   err.style.display = 'none';
 
   const entry = {
-    total, male:male||null, female:female||null,
-    country: isAbroad?(country||'—'):null,
+    total, male: male || null, female: female || null,
+    originType,
+    place: (originType !== 'local') ? (place || '—') : null,
     surveyor: currentSurveyor,
-    time: new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'})
+    time: new Date().toLocaleTimeString('en-US', {hour:'2-digit', minute:'2-digit'})
   };
 
-  if (editingIndex!==null) {
+  if (editingIndex !== null) {
     entry.time = entries[editingIndex].time;
     entries[editingIndex] = entry;
     editingIndex = null;
-  } else { entries.push(entry); }
+  } else {
+    entries.push(entry);
+  }
 
   save(); renderTabs(); render(); resetForm();
 }
 
-/* ─── EDIT ─── */
+// EDIT
 function editEntry(realIdx) {
   const e = entries[realIdx];
   editingIndex = realIdx;
   document.getElementById('inp-total').value  = e.total  || '';
   document.getElementById('inp-male').value   = e.male   || '';
   document.getElementById('inp-female').value = e.female || '';
-  const abroad = !!e.country;
-  document.getElementById(abroad?'r-abroad':'r-local').checked = true;
-  const ci = document.getElementById('country-input');
-  ci.disabled = !abroad; ci.value = abroad ? e.country : '';
-  const filtered = filteredEntries();
-  const dispIdx  = filtered.findIndex(x=>x._idx===realIdx);
+  const originType = e.originType || 'local';
+  document.getElementById('r-' + (originType === 'municipality' ? 'municipality' : originType === 'abroad' ? 'abroad' : 'local')).checked = true;
+  const pi = document.getElementById('place-input');
+  if (originType === 'local') { pi.disabled = true; pi.value = ''; pi.placeholder = ''; }
+  else if (originType === 'municipality') { pi.disabled = false; pi.value = e.place||''; pi.placeholder = 'Municipality / City name'; }
+  else { pi.disabled = false; pi.value = e.place||''; pi.placeholder = 'Country name'; }
   document.getElementById('form-title').textContent       = 'Edit Entry';
   document.getElementById('edit-indicator').style.display = 'inline-block';
-  document.getElementById('edit-num').textContent         = dispIdx+1;
   document.getElementById('btn-submit').textContent       = '✓ Save Changes';
   document.getElementById('btn-cancel').style.display     = 'block';
-  document.querySelectorAll('tbody tr').forEach((r,i) => r.classList.toggle('editing-row',i===dispIdx));
   document.querySelector('.form-section').scrollIntoView({behavior:'smooth'});
 }
-function cancelEdit() { editingIndex=null; resetForm(); }
 
-/* ─── DELETE ─── */
+function cancelEdit() { editingIndex = null; resetForm(); }
+
+// DELETE
 function deleteEntry(realIdx) {
   pendingDeleteIndex = realIdx;
-  const dispIdx = filteredEntries().findIndex(x=>x._idx===realIdx);
-  document.getElementById('del-num').textContent = dispIdx+1;
   document.getElementById('delete-modal').classList.add('active');
 }
+
 function confirmDelete() {
-  if (pendingDeleteIndex!==null) {
-    if (editingIndex===pendingDeleteIndex) { editingIndex=null; resetForm(); }
-    else if (editingIndex!==null && editingIndex>pendingDeleteIndex) editingIndex--;
-    entries.splice(pendingDeleteIndex,1);
+  if (pendingDeleteIndex !== null) {
+    if (editingIndex === pendingDeleteIndex) { editingIndex = null; resetForm(); }
+    else if (editingIndex !== null && editingIndex > pendingDeleteIndex) editingIndex--;
+    entries.splice(pendingDeleteIndex, 1);
     pendingDeleteIndex = null;
     save(); renderTabs(); render();
   }
   closeDeleteModal();
 }
-function closeDeleteModal() { document.getElementById('delete-modal').classList.remove('active'); pendingDeleteIndex=null; }
 
-/* ─── RESET FORM ─── */
+function closeDeleteModal() { document.getElementById('delete-modal').classList.remove('active'); pendingDeleteIndex = null; }
+
+// RESET FORM
 function resetForm() {
-  ['inp-total','inp-male','inp-female'].forEach(id=>document.getElementById(id).value='');
+  ['inp-total','inp-male','inp-female'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('r-local').checked = true;
-  document.getElementById('country-input').disabled = true;
-  document.getElementById('country-input').value = '';
+  const pi = document.getElementById('place-input');
+  pi.disabled = true; pi.value = ''; pi.placeholder = '';
   document.getElementById('count-error').style.display     = 'none';
   document.getElementById('form-title').textContent        = 'Add Entry';
   document.getElementById('edit-indicator').style.display  = 'none';
   document.getElementById('btn-submit').textContent        = '+ Add to Log';
   document.getElementById('btn-cancel').style.display      = 'none';
-  document.querySelectorAll('tbody tr').forEach(r=>r.classList.remove('editing-row'));
 }
 
-/* ─── RENDER ─── */
+// SECTION TOGGLE
+function toggleSection(type) {
+  sectionVisible[type] = !sectionVisible[type];
+  const blockId = type === 'local' ? 'block-local' : type === 'muni' ? 'block-muni' : 'block-foreign';
+  const tabId   = 'stab-' + type;
+  document.getElementById(blockId).classList.toggle('hidden', !sectionVisible[type]);
+  // update tab opacity
+  document.getElementById(tabId).style.opacity = sectionVisible[type] ? '1' : '0.45';
+}
+
+// RENDER
 function render() {
-  const body = document.getElementById('log-body');
-  const view = filteredEntries();
-  let totals = {t:0,m:0,f:0};
-  view.forEach(e=>{totals.t+=e.total;totals.m+=(e.male||0);totals.f+=(e.female||0);});
-  document.getElementById('stat-total').textContent  = totals.t;
-  document.getElementById('stat-male').textContent   = totals.m;
-  document.getElementById('stat-female').textContent = totals.f;
+  const all = filteredEntries();
+  const locals   = getByType('local', all);
+  const munis    = getByType('municipality', all);
+  const foreigns = getByType('abroad', all);
 
-  if (activeTab==='all') {
-    document.getElementById('log-title').textContent = "All Surveyors' Log";
-    document.getElementById('log-meta').textContent  = `${getSurveyors().length} surveyor(s) · ${entries.length} entries`;
-  } else {
-    document.getElementById('log-title').textContent = `${activeTab}'s Log`;
-    document.getElementById('log-meta').textContent  = `${view.length} entries`;
-  }
+  // stats (all types combined)
+  let totT=0, totM=0, totF=0;
+  all.forEach(e => { totT+=e.total; totM+=(e.male||0); totF+=(e.female||0); });
+  document.getElementById('stat-total').textContent  = totT;
+  document.getElementById('stat-male').textContent   = totM;
+  document.getElementById('stat-female').textContent = totF;
 
-  if (!view.length) {
-    body.innerHTML = '<tr><td colspan="8"><div class="empty-state"><span>📋</span>No entries yet</div></td></tr>';
+  // section tab counts
+  document.getElementById('stab-count-local').textContent   = locals.length;
+  document.getElementById('stab-count-muni').textContent    = munis.length;
+  document.getElementById('stab-count-foreign').textContent = foreigns.length;
+
+  // render each table
+  renderTable('tbody-local', 'meta-local', locals, false);
+  renderTable('tbody-muni', 'meta-muni', munis, true);
+  renderTable('tbody-foreign', 'meta-foreign', foreigns, true, true);
+}
+
+function renderTable(tbodyId, metaId, rows, showPlace, isForeign) {
+  const tbody = document.getElementById(tbodyId);
+  const meta  = document.getElementById(metaId);
+  const totT  = rows.reduce((a,e)=>a+e.total,0);
+  const totM  = rows.reduce((a,e)=>a+(e.male||0),0);
+  const totF  = rows.reduce((a,e)=>a+(e.female||0),0);
+  meta.textContent = rows.length + ' entr' + (rows.length===1?'y':'ies') + '  ·  Total: ' + totT + '  ·  ♂' + totM + ' ♀' + totF;
+
+  if (!rows.length) {
+    const cols = showPlace ? 8 : 7;
+    tbody.innerHTML = `<tr><td colspan="${cols}"><div class="empty-state"><span>${isForeign?'🌍':showPlace?'🗺':'🏠'}</span>No entries yet</div></td></tr>`;
     return;
   }
 
-  body.innerHTML = view.map((e,dispIdx) => `
-    <tr ${e._idx===editingIndex?'class="editing-row"':''}>
-      <td>#${dispIdx+1}</td>
-      <td class="total-val">${e.total}</td>
+  const colorClass = isForeign ? 'foreign-val' : showPlace ? 'muni-val' : '';
+  const tagClass   = isForeign ? 'foreign-tag' : showPlace ? 'muni-tag' : 'local-tag';
+
+  tbody.innerHTML = rows.map((e, dispIdx) => {
+    const placeCell = showPlace
+      ? `<td><span class="place-tag ${tagClass}">${e.place||'—'}</span></td>`
+      : '';
+    return `<tr ${e._idx===editingIndex?'class="editing-row"':''}>
+      <td>#${rows.length - dispIdx}</td>
+      <td class="total-val ${colorClass}">${e.total}</td>
       <td class="male-val">${e.male!=null?e.male:'<span style="opacity:.3">—</span>'}</td>
       <td class="female-val">${e.female!=null?e.female:'<span style="opacity:.3">—</span>'}</td>
-      <td>${e.country?`<span class="country-tag">🌍 ${e.country}</span>`:'<span class="local-tag">Local</span>'}</td>
+      ${placeCell}
       <td><span class="surveyor-tag">${e.surveyor}</span></td>
       <td style="font-size:0.78rem;color:var(--text-dim)">${e.time||'—'}</td>
-      <td>
-        <div class="action-btns">
-          <button class="btn-edit" onclick="editEntry(${e._idx})" title="Edit">✏️</button>
-          <button class="btn-del"  onclick="deleteEntry(${e._idx})" title="Delete">🗑</button>
-        </div>
-      </td>
-    </tr>
-  `).join('');
+      <td><div class="action-btns">
+        <button class="btn-edit" onclick="editEntry(${e._idx})" title="Edit">✏️</button>
+        <button class="btn-del"  onclick="deleteEntry(${e._idx})" title="Delete">🗑</button>
+      </div></td>
+    </tr>`;
+  }).join('');
 }
 
-/* ═══════════════════════════════════════════
-   EXPORT (Word + CSV)
-═══════════════════════════════════════════ */
+// CLEAR by type
+function confirmClearType(type) {
+  pendingClearType = type;
+  const label = type==='local' ? 'local' : type==='municipality' ? 'other municipality' : 'foreign / other country';
+  document.getElementById('clear-modal-desc').innerHTML =
+    `This will permanently delete all <strong>${label} visitor entries</strong> in the current view. <strong style="color:var(--accent-gold)">Export first to keep a backup.</strong>`;
+  document.getElementById('clear-modal').classList.add('active');
+}
+
+function closeClearModal() { document.getElementById('clear-modal').classList.remove('active'); }
+
+function doClearType() {
+  if (!pendingClearType) return;
+  const type = pendingClearType;
+  const view = filteredEntries().map(e=>e._idx);
+  const viewSet = new Set(view);
+  entries = entries.filter((e,i) => !(viewSet.has(i) && e.originType===type));
+  pendingClearType = null;
+  save(); renderTabs(); render(); cancelEdit(); closeClearModal();
+  toast('🗑 Entries cleared');
+}
+
+function exportThenClear() {
+  const data = filteredEntries();
+  const docTitle = activeTab==='all' ? 'All Surveyors — Visitor Log' : `${activeTab} — Visitor Log`;
+  closeClearModal();
+  doExportCSV(data, docTitle);
+  setTimeout(() => {
+    const type = pendingClearType;
+    if (!type) return;
+    const view = filteredEntries().map(e=>e._idx);
+    const viewSet = new Set(view);
+    entries = entries.filter((e,i) => !(viewSet.has(i) && e.originType===type));
+    pendingClearType = null;
+    save(); renderTabs(); render(); cancelEdit();
+    toast('✅ Exported & cleared');
+  }, 400);
+}
+
+// EXPORT
 let exportFmt = 'docx';
 
 function setFmt(fmt) {
   exportFmt = fmt;
   document.getElementById('fmt-docx').classList.toggle('active', fmt==='docx');
   document.getElementById('fmt-csv').classList.toggle('active',  fmt==='csv');
-  document.getElementById('exp-go-btn').textContent =
-    fmt==='csv' ? '⬇ Download .csv' : '⬇ Download .docx';
+  document.getElementById('exp-go-btn').textContent = fmt==='csv' ? '⬇ Download .csv' : '⬇ Download .docx';
 }
 
 function openExportModal() {
@@ -808,21 +1838,20 @@ function openExportModal() {
   setFmt('docx');
   document.getElementById('export-modal').classList.add('active');
 }
-function closeExportModal() {
-  document.getElementById('export-modal').classList.remove('active');
-}
+
+function closeExportModal() { document.getElementById('export-modal').classList.remove('active'); }
 
 function resolveExportData() {
   const scope = document.querySelector('input[name="exp-scope"]:checked').value;
   let data, docTitle;
-  if (scope==='view') {
-    data     = filteredEntries();
+  if (scope === 'view') {
+    data = filteredEntries();
     docTitle = activeTab==='all' ? 'All Surveyors — Visitor Log' : `${activeTab} — Visitor Log`;
-  } else if (scope==='mine') {
-    data     = entries.map((e,i)=>({...e,_idx:i})).filter(e=>e.surveyor===currentSurveyor);
+  } else if (scope === 'mine') {
+    data = entries.map((e,i)=>({...e,_idx:i})).filter(e=>e.surveyor===currentSurveyor);
     docTitle = `${currentSurveyor} — Visitor Log`;
   } else {
-    data     = entries.map((e,i)=>({...e,_idx:i}));
+    data = entries.map((e,i)=>({...e,_idx:i}));
     docTitle = 'All Surveyors — Visitor Log';
   }
   return {data, docTitle};
@@ -832,245 +1861,130 @@ async function doExport() {
   const {data, docTitle} = resolveExportData();
   if (!data.length) { closeExportModal(); toast('⚠ No entries to export.'); return; }
   closeExportModal();
-  if (exportFmt==='csv') { doExportCSV(data, docTitle); }
-  else                   { await doExportDocx(data, docTitle); }
+  if (exportFmt === 'csv') doExportCSV(data, docTitle);
+  else await doExportDocx(data, docTitle);
 }
 
-/* ── CSV ── */
 function doExportCSV(data, docTitle) {
   const dateStr = new Date().toISOString().slice(0,10);
-  const header  = ['#','Total','Male','Female','Visiting From','Surveyor','Time'];
-  const rows    = data.map((e,i) => [
-    i+1, e.total, e.male??'', e.female??'',
-    e.country ? e.country : 'Local', e.surveyor, e.time||''
+  const header = ['#','Type','Total','Male','Female','Place','Surveyor','Time'];
+  const rows = data.map((e,i) => [
+    i+1,
+    e.originType==='local' ? 'Local' : e.originType==='municipality' ? 'Other Municipality' : 'Foreign',
+    e.total, e.male??'', e.female??'',
+    e.place||'—', e.surveyor, e.time||''
   ]);
   const sumT=data.reduce((a,e)=>a+e.total,0);
   const sumM=data.reduce((a,e)=>a+(e.male||0),0);
   const sumF=data.reduce((a,e)=>a+(e.female||0),0);
-  rows.push(['TOTAL',sumT,sumM,sumF,'','','']);
-  const csv = [header,...rows]
-    .map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  rows.push(['TOTAL','',sumT,sumM,sumF,'','','']);
+  const csv = [header,...rows].map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
   const blob = new Blob(['\uFEFF'+csv],{type:'text/csv;charset=utf-8;'});
   const safe = docTitle.replace(/[^\w\s\-]/g,'').trim().replace(/\s+/g,'_');
   saveAs(blob, `VisitorLog_${safe}_${dateStr}.csv`);
   toast(`✅ Exported ${data.length} entr${data.length===1?'y':'ies'} as CSV`);
 }
 
-/* ── Word ── */
 async function doExportDocx(data, docTitle) {
   const btn = document.getElementById('btn-export');
   btn.classList.add('busy'); btn.textContent='⏳ Building…';
-
   const dateStr = new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const timeStr = new Date().toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit'});
 
   try {
-    const {
-      Document, Packer, Paragraph, TextRun,
-      Table, TableRow, TableCell,
-      AlignmentType, WidthType, BorderStyle, ShadingType, VerticalAlign
-    } = docx;  // global from UMD script
+    const {Document,Packer,Paragraph,TextRun,Table,TableRow,TableCell,AlignmentType,WidthType,BorderStyle,ShadingType,VerticalAlign} = docx;
+    const C = {headerBg:'1B4F72',headerText:'FFFFFF',rowAlt:'EBF5FB',rowEven:'FFFFFF',totalBg:'154360',totalText:'FFFFFF',teal:'0E8C77',male:'1A5276',female:'6C3483',black:'1C2833',grey:'5D6D7E',lightGrey:'AAB7B8',muniHeader:'4A235A',foreignHeader:'7D6608'};
+    const bdr = (color='CCCCCC') => ({top:{style:BorderStyle.SINGLE,size:4,color},bottom:{style:BorderStyle.SINGLE,size:4,color},left:{style:BorderStyle.SINGLE,size:4,color},right:{style:BorderStyle.SINGLE,size:4,color}});
 
-    /* ── colour palette ── */
-    const C = {
-      headerBg   : '1B4F72',   // deep navy blue
-      headerText : 'FFFFFF',
-      rowAlt     : 'EBF5FB',   // light blue tint
-      rowEven    : 'FFFFFF',
-      totalBg    : '154360',   // darker navy for totals row
-      totalText  : 'FFFFFF',
-      teal       : '0E8C77',
-      male       : '1A5276',
-      female     : '6C3483',
-      black      : '1C2833',
-      grey       : '5D6D7E',
-      lightGrey  : 'AAB7B8',
-    };
-
-    /* ── column widths (DXA, must sum to 9360 for US Letter 1" margins) ── */
-    //  #     Total  Male   Female  From    Surveyor  Time
-    const colW = [680, 1100, 1100, 1100, 2100, 1640, 1640];
-    // sum = 9360 ✓
-
-    const bdr = (color='CCCCCC') => ({
-      top:    {style:BorderStyle.SINGLE, size:4, color},
-      bottom: {style:BorderStyle.SINGLE, size:4, color},
-      left:   {style:BorderStyle.SINGLE, size:4, color},
-      right:  {style:BorderStyle.SINGLE, size:4, color},
-    });
-
-    /* helper: make a single table cell */
-    function mkCell(text, colIdx, opts={}) {
-      const {
-        fill        = 'FFFFFF',
-        textColor   = C.black,
-        bold        = false,
-        align       = AlignmentType.CENTER,
-        fontSize    = 19,
-        borderColor = 'D5D8DC',
-        italic      = false,
-      } = opts;
-      return new TableCell({
-        width:   {size: colW[colIdx], type: WidthType.DXA},
-        shading: {fill, type: ShadingType.CLEAR},
-        margins: {top:80, bottom:80, left:120, right:120},
-        verticalAlign: VerticalAlign.CENTER,
-        borders: bdr(borderColor),
-        children: [new Paragraph({
-          alignment: align,
-          children:  [new TextRun({
-            text:   String(text ?? '—'),
-            bold,
-            italics: italic,
-            color:  textColor,
-            size:   fontSize,
-            font:   'Calibri',
-          })]
-        })]
-      });
+    function mkCell(text,w,opts={}) {
+      const {fill='FFFFFF',textColor=C.black,bold=false,align=AlignmentType.CENTER,fontSize=19,borderColor='D5D8DC',italic=false}=opts;
+      return new TableCell({width:{size:w,type:WidthType.DXA},shading:{fill,type:ShadingType.CLEAR},margins:{top:80,bottom:80,left:120,right:120},verticalAlign:VerticalAlign.CENTER,borders:bdr(borderColor),children:[new Paragraph({alignment:align,children:[new TextRun({text:String(text??'—'),bold,italics:italic,color:textColor,size:fontSize,font:'Calibri'})]})]});
     }
 
-    /* ── Header row ── */
-    const headers = ['#','Total','Male ♂','Female ♀','Visiting From','Surveyor','Time'];
-    const headerRow = new TableRow({
-      tableHeader: true,
-      children: headers.map((h,i) => mkCell(h, i, {
-        fill: C.headerBg, textColor: C.headerText,
-        bold: true, borderColor: C.headerBg, fontSize: 20,
-      }))
-    });
+    function buildTable(rows, headers, colWidths, headerBg) {
+      const hRow = new TableRow({tableHeader:true, children:headers.map((h,i)=>mkCell(h,colWidths[i],{fill:headerBg,textColor:'FFFFFF',bold:true,borderColor:headerBg,fontSize:20}))});
+      const dRows = rows.map((e,rowIdx)=>{
+        const fill=rowIdx%2===0?C.rowEven:C.rowAlt;
+        const cells=[
+          mkCell(rowIdx+1,colWidths[0],{fill,textColor:C.grey}),
+          mkCell(e.total,colWidths[1],{fill,textColor:C.teal,bold:true}),
+          mkCell(e.male??'—',colWidths[2],{fill,textColor:C.male}),
+          mkCell(e.female??'—',colWidths[3],{fill,textColor:C.female}),
+        ];
+        if(headers.length>6){cells.push(mkCell(e.place||'—',colWidths[4],{fill,textColor:C.black,align:AlignmentType.LEFT}));}
+        cells.push(mkCell(e.surveyor,colWidths[headers.length>6?5:4],{fill,textColor:C.black}));
+        cells.push(mkCell(e.time||'—',colWidths[headers.length>6?6:5],{fill,textColor:C.grey,italic:true}));
+        return new TableRow({children:cells});
+      });
+      const sumT=rows.reduce((a,e)=>a+e.total,0),sumM=rows.reduce((a,e)=>a+(e.male||0),0),sumF=rows.reduce((a,e)=>a+(e.female||0),0);
+      const tCells=[
+        mkCell('TOTAL',colWidths[0],{fill:C.totalBg,textColor:C.totalText,bold:true,borderColor:C.totalBg}),
+        mkCell(sumT,colWidths[1],{fill:C.totalBg,textColor:C.totalText,bold:true,borderColor:C.totalBg}),
+        mkCell(sumM,colWidths[2],{fill:C.totalBg,textColor:C.totalText,bold:true,borderColor:C.totalBg}),
+        mkCell(sumF,colWidths[3],{fill:C.totalBg,textColor:C.totalText,bold:true,borderColor:C.totalBg}),
+      ];
+      const extras=(headers.length>6?3:2);
+      for(let i=0;i<extras;i++) tCells.push(mkCell('',colWidths[4+i]||1000,{fill:C.totalBg,textColor:C.totalText,borderColor:C.totalBg}));
+      const totRow=new TableRow({children:tCells});
+      const total=colWidths.reduce((a,b)=>a+b,0);
+      return new Table({width:{size:total,type:WidthType.DXA},columnWidths:colWidths,rows:[hRow,...dRows,totRow]});
+    }
 
-    /* ── Data rows ── */
-    const dataRows = data.map((e, rowIdx) => {
-      const isEven = rowIdx % 2 === 0;
-      const fill   = isEven ? C.rowEven : C.rowAlt;
-      return new TableRow({ children: [
-        mkCell(rowIdx+1,                          0, {fill, textColor:C.grey}),
-        mkCell(e.total,                           1, {fill, textColor:C.teal,  bold:true}),
-        mkCell(e.male   ?? '—',                   2, {fill, textColor:C.male}),
-        mkCell(e.female ?? '—',                   3, {fill, textColor:C.female}),
-        mkCell(e.country ? e.country : 'Local',   4, {fill, textColor:C.black, align:AlignmentType.LEFT}),
-        mkCell(e.surveyor,                         5, {fill, textColor:C.black}),
-        mkCell(e.time || '—',                      6, {fill, textColor:C.grey, italic:true}),
-      ]});
-    });
+    const run=(text,opts={})=>new TextRun({text,font:'Calibri',...opts});
+    const para=(children,opts={})=>new Paragraph({children,...opts});
+    const heading=(text,color)=>para([run(text,{bold:true,size:28,color})],{spacing:{after:120}});
 
-    /* ── Totals row ── */
-    const sumT = data.reduce((a,e)=>a+e.total,0);
-    const sumM = data.reduce((a,e)=>a+(e.male||0),0);
-    const sumF = data.reduce((a,e)=>a+(e.female||0),0);
-    const totalsRow = new TableRow({ children: [
-      mkCell('TOTAL', 0, {fill:C.totalBg, textColor:C.totalText, bold:true, borderColor:C.totalBg}),
-      mkCell(sumT,    1, {fill:C.totalBg, textColor:C.totalText, bold:true, borderColor:C.totalBg}),
-      mkCell(sumM,    2, {fill:C.totalBg, textColor:C.totalText, bold:true, borderColor:C.totalBg}),
-      mkCell(sumF,    3, {fill:C.totalBg, textColor:C.totalText, bold:true, borderColor:C.totalBg}),
-      mkCell('',      4, {fill:C.totalBg, textColor:C.totalText, borderColor:C.totalBg}),
-      mkCell('',      5, {fill:C.totalBg, textColor:C.totalText, borderColor:C.totalBg}),
-      mkCell('',      6, {fill:C.totalBg, textColor:C.totalText, borderColor:C.totalBg}),
-    ]});
+    const localRows   = data.filter(e=>e.originType==='local');
+    const muniRows    = data.filter(e=>e.originType==='municipality');
+    const foreignRows = data.filter(e=>e.originType==='abroad');
 
-    const visitorTable = new Table({
-      width: {size:9360, type:WidthType.DXA},
-      columnWidths: colW,
-      rows: [headerRow, ...dataRows, totalsRow],
-    });
+    const colNoPlace = [680,1100,1100,1100,1800,1580];
+    const colPlace   = [680,1000,1000,1000,2100,1640,1540];
 
-    /* ── Summary paragraph helpers ── */
-    const run = (text, opts={}) => new TextRun({text, font:'Calibri', ...opts});
-    const para = (children, opts={}) => new Paragraph({children, ...opts});
+    const sumT=data.reduce((a,e)=>a+e.total,0);
+    const sumM=data.reduce((a,e)=>a+(e.male||0),0);
+    const sumF=data.reduce((a,e)=>a+(e.female||0),0);
 
-    /* ── Build document ── */
-    const doc = new Document({
-      styles: {
-        default: { document: { run: { font:'Calibri', size:22 } } }
-      },
-      sections: [{
-        properties: {
-          page: {
-            size:   {width:12240, height:15840},
-            margin: {top:1080, right:1080, bottom:1080, left:1080}  // 0.75" margins
-          }
-        },
-        children: [
-          /* Title */
-          para([
-            run('Visitor Log Report', {bold:true, size:48, color:C.headerBg}),
-          ], {spacing:{after:120}}),
+    const children=[
+      para([run('Visitor Log Report',{bold:true,size:48,color:C.headerBg})],{spacing:{after:120}}),
+      para([run(docTitle,{size:26,color:C.grey})],{spacing:{after:80}}),
+      para([run(`Generated: ${dateStr} at ${timeStr}`,{size:18,color:C.lightGrey,italics:true})],{spacing:{after:320}}),
+      para([run('Summary   ',{bold:true,size:22}),run(`${data.length} entries  ·  `,{size:22,color:C.grey}),run(`Total: ${sumT}`,{bold:true,size:22,color:C.teal}),run(`   ·   Male: ${sumM}`,{size:22,color:C.male}),run(`   ·   Female: ${sumF}`,{size:22,color:C.female})],{spacing:{after:400}}),
+    ];
 
-          /* Subtitle */
-          para([
-            run(docTitle, {size:26, color:C.grey}),
-          ], {spacing:{after:80}}),
+    if(localRows.length){
+      children.push(heading('🏠 Local Visitors',C.headerBg));
+      children.push(buildTable(localRows,['#','Total','Male ♂','Female ♀','Surveyor','Time'],colNoPlace,C.headerBg));
+      children.push(para([],{spacing:{after:360}}));
+    }
+    if(muniRows.length){
+      children.push(heading('🗺 Other Municipality Visitors',C.muniHeader));
+      children.push(buildTable(muniRows,['#','Total','Male ♂','Female ♀','Municipality','Surveyor','Time'],colPlace,C.muniHeader));
+      children.push(para([],{spacing:{after:360}}));
+    }
+    if(foreignRows.length){
+      children.push(heading('🌍 Foreign / Other Country Visitors',C.foreignHeader));
+      children.push(buildTable(foreignRows,['#','Total','Male ♂','Female ♀','Country','Surveyor','Time'],colPlace,C.foreignHeader));
+      children.push(para([],{spacing:{after:360}}));
+    }
 
-          /* Generated line */
-          para([
-            run(`Generated: ${dateStr} at ${timeStr}`, {size:18, color:C.lightGrey, italics:true}),
-          ], {spacing:{after:320}}),
+    children.push(para([run(`Exported from Visitor Log App  ·  ${dateStr}`,{size:16,color:C.lightGrey,italics:true})],{spacing:{before:280},alignment:AlignmentType.RIGHT}));
 
-          /* Summary stats */
-          para([
-            run('Summary   ',   {bold:true, size:22}),
-            run(`${data.length} entries  ·  `, {size:22, color:C.grey}),
-            run(`Total Visitors: ${sumT}`, {bold:true, size:22, color:C.teal}),
-            run(`   ·   Male: ${sumM}`, {size:22, color:C.male}),
-            run(`   ·   Female: ${sumF}`, {size:22, color:C.female}),
-          ], {spacing:{after:280}}),
-
-          /* Table */
-          visitorTable,
-
-          /* Footer note */
-          para([
-            run(`Exported from Visitor Log App  ·  ${dateStr}`, {size:16, color:C.lightGrey, italics:true}),
-          ], {spacing:{before:280}, alignment:AlignmentType.RIGHT}),
-        ]
-      }]
-    });
-
-    const blob = await Packer.toBlob(doc);
-    const safe = docTitle.replace(/[^\w\s\-]/g,'').trim().replace(/\s+/g,'_');
-    saveAs(blob, `VisitorLog_${safe}_${new Date().toISOString().slice(0,10)}.docx`);
+    const doc=new Document({styles:{default:{document:{run:{font:'Calibri',size:22}}}},sections:[{properties:{page:{size:{width:12240,height:15840},margin:{top:1080,right:1080,bottom:1080,left:1080}}},children}]});
+    const blob=await Packer.toBlob(doc);
+    const safe=docTitle.replace(/[^\w\s\-]/g,'').trim().replace(/\s+/g,'_');
+    saveAs(blob,`VisitorLog_${safe}_${new Date().toISOString().slice(0,10)}.docx`);
     toast(`✅ Exported ${data.length} entr${data.length===1?'y':'ies'} as Word doc`);
-
   } catch(err) {
     console.error(err);
-    toast('❌ Export failed — check your internet connection (CDN required)');
+    toast('❌ Export failed — check connection (CDN required)');
   }
-
-  btn.classList.remove('busy');
-  btn.textContent = '📄 Export';
+  btn.classList.remove('busy'); btn.textContent='📄 Export';
 }
 
-/* ─── CLEAR with export-first prompt ─── */
-function confirmClear() {
-  if (!filteredEntries().length) return;
-  const label = activeTab==='all' ? 'all entries' : `all of ${activeTab}'s entries`;
-  document.getElementById('clear-modal-desc').innerHTML =
-    `This will permanently delete <strong>${label}</strong> from your browser. <strong style="color:var(--accent-gold)">Export first to keep a backup — this cannot be undone.</strong>`;
-  document.getElementById('clear-modal').classList.add('active');
-}
-function closeClearModal() { document.getElementById('clear-modal').classList.remove('active'); }
-function doClearAll() {
-  entries = activeTab==='all' ? [] : entries.filter(e=>e.surveyor!==activeTab);
-  save(); renderTabs(); render(); cancelEdit(); closeClearModal();
-  toast('🗑 Entries cleared');
-}
-function exportThenClear() {
-  const data     = filteredEntries();
-  const docTitle = activeTab==='all' ? 'All Surveyors — Visitor Log' : `${activeTab} — Visitor Log`;
-  closeClearModal();
-  doExportCSV(data, docTitle);
-  setTimeout(() => {
-    entries = activeTab==='all' ? [] : entries.filter(e=>e.surveyor!==activeTab);
-    save(); renderTabs(); render(); cancelEdit();
-    toast('✅ Exported & cleared');
-  }, 400);
-}
-
-/* ─── INIT ─── */
+// INIT
 document.getElementById('today-date').textContent =
   new Date().toLocaleDateString('en-US',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-
 renderTabs();
 render();
 </script>
